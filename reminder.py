@@ -18,11 +18,14 @@ def get_access_token():
     """Get OAuth2 access token using client credentials."""
     response = requests.post(
         f"{PRACTICE_BETTER_BASE_URL}/oauth2/token",
+        auth=(PB_CLIENT_ID, PB_CLIENT_SECRET),
         data={
             "grant_type": "client_credentials",
-            "client_id": PB_CLIENT_ID,
-            "client_secret": PB_CLIENT_SECRET,
             "scope": "read"
+        }
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
         }
     )
     response.raise_for_status()
