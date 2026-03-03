@@ -26,10 +26,6 @@ def get_access_token():
     )
     response.raise_for_status()
     return response.json()["access_token"]
-        }
-    )
-    response.raise_for_status()
-    return response.json()["access_token"]
 
 # ============ FUNCTIONS ============
 def get_appointments_in_7_days(token):
