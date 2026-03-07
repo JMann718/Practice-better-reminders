@@ -99,8 +99,9 @@ def main():
     for session in sessions:
         client_record = session.get("clientRecord", {})
         record_id = client_record.get("id")
-        client_name = client_record.get("name", "Client")
-        client_email = client_record.get("email")
+        profile = client_record.get("profile", {})
+        client_name = f"{profile.get('firstName', '')} {profile.get('lastName', '')}".strip() or "Client"
+        client_email = profile.get("emailAddress")
         session_date = session.get("sessionDate", "")
 
         log(f"Checking client: {client_name}, email: {client_email}, date: {session_date}")
