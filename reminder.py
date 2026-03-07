@@ -52,7 +52,7 @@ def get_sessions_in_7_days(token):
     log(f"Sessions API status: {response.status_code}")
     log(f"Sessions API response: {response.text[:500]}")
     response.raise_for_status()
-    return response.json().get("data", [])
+    return response.json().get("items", [])
 
 def get_incomplete_form_requests(record_id, token):
     headers = {"Authorization": f"Bearer {token}"}
@@ -62,7 +62,7 @@ def get_incomplete_form_requests(record_id, token):
         params={"records": record_id}
     )
     response.raise_for_status()
-    forms = response.json().get("data", [])
+    forms = response.json().get("items", [])
     return [f for f in forms if not f.get("completed")]
 
 def send_reminder_email(client_email, client_name, session_date):
