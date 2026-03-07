@@ -18,7 +18,6 @@ def log(msg):
     print(msg, flush=True)
     sys.stdout.flush()
 
-# ============ GET OAuth TOKEN ============
 def get_access_token():
     response = requests.post(
         f"{PRACTICE_BETTER_BASE_URL}/oauth2/token",
@@ -31,11 +30,10 @@ def get_access_token():
     response.raise_for_status()
     return response.json()["access_token"]
 
-# ============ FUNCTIONS ============
 def get_sessions_in_7_days(token):
     now = datetime.now(timezone.utc)
-    target_start = (now + timedelta(days=5)).replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    target_end = (now + timedelta(days=5)).replace(hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    target_start = (now + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    target_end = (now + timedelta(days=7)).replace(hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
     log(f"Looking for sessions between {target_start} and {target_end}")
 
@@ -49,8 +47,6 @@ def get_sessions_in_7_days(token):
             "limit": 100
         }
     )
-    log(f"Sessions API status: {response.status_code}")
-    log(f"Sessions API response: {response.text[:500]}")
     response.raise_for_status()
     return response.json().get("items", [])
 
@@ -65,14 +61,14 @@ def get_incomplete_form_requests(record_id, token):
     forms = response.json().get("items", [])
     return [f for f in forms if not f.get("completed")]
 
-def send_reminder_email(client_email, client_name, session_date):
+def send_reminder_email(client_email, first_name, session_date):
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = client_email
     msg["Subject"] = "Reminder: Please Complete Your Forms Before Your Appointment"
 
     body = f"""
-Hi {client_name},
+Hi {first_name},
 
 This is a friendly reminder that your appointment is scheduled for {session_date}.
 
@@ -86,7 +82,7 @@ Thank you!
         server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_ADDRESS, client_email, msg.as_string())
 
-    log(f"Reminder sent to {client_name} ({client_email})")
+    log(f"Reminder sent to {first_name} ({client_email})")
 
 def main():
     log("Starting reminder script")
@@ -100,7 +96,8 @@ def main():
         client_record = session.get("clientRecord", {})
         record_id = client_record.get("id")
         profile = client_record.get("profile", {})
-        client_name = f"{profile.get('firstName', '')} {profile.get('lastName', '')}".strip() or "Client"
+        first_name = profile.get("firstName", "there")
+        client_name = f"{first_name} {profile.get('lastName', '')}".strip()
         client_email = profile.get("emailAddress")
         session_date = session.get("sessionDate", "")
 
@@ -114,7 +111,7 @@ def main():
         log(f"Incomplete forms for {client_name}: {len(incomplete_forms)}")
 
         if incomplete_forms:
-            send_reminder_email(client_email, client_name, session_date)
+            send_reminder_email(client_email, first_name, session_date)
         else:
             log(f"No incomplete forms for {client_name}, no email sent")
 
