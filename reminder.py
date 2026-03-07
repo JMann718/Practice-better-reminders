@@ -31,7 +31,7 @@ def get_access_token():
 def get_sessions_in_7_days(token):
     """Fetch sessions scheduled 7 days from now."""
     now = datetime.now(timezone.utc)
-    target_start = (now + timedelta(days=7)).replace(hour=0, minute=0, second=0).isoformat()
-    target_end = (now + timedelta(days=7)).replace(hour=23, minute=59, second=59).isoformat()
+    target_start = (now + timedelta(days=5)).replace(hour=0, minute=0, second=0).isoformat()
+    target_end = (now + timedelta(days=5)).replace(hour=23, minute=59, second=59).isoformat()
 
     print(f"Looking for sessions between {target_start} and {target_end}")
