@@ -61,7 +61,7 @@ def get_incomplete_form_requests(record_id, token):
     forms = response.json().get("items", [])
     return [f for f in forms if not f.get("completed")]
 
-def send_reminder_email(client_email, first_name, session_date):
+def send_reminder_email(client_email, first_name, formatted_date):
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = client_email
@@ -70,7 +70,7 @@ def send_reminder_email(client_email, first_name, session_date):
     body = f"""
 Hi {first_name},
 
-This is a friendly reminder that your appointment is scheduled for {session_date}.
+This is a friendly reminder that your appointment is scheduled for {formatted_date}.
 
 We noticed you have forms that still need to be completed. Please log into your client portal to complete them before your appointment.
 
@@ -106,18 +106,16 @@ def main():
         if not client_email:
             log(f"No email for {client_name}, skipping")
             continue
-        if incomplete_forms:
-            from datetime import datetime
-            dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
-            formatted_date = dt.strftime("%m/%d/%Y at %I:%M %p")
-            send_reminder_email(client_email, first_name, formatted_date)
+
         incomplete_forms = get_incomplete_form_requests(record_id, token)
         log(f"Incomplete forms for {client_name}: {len(incomplete_forms)}")
 
-        
+        if incomplete_forms:
+            dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
+            formatted_date = dt.strftime("%m/%d/%Y at %I:%M %p")
+            send_reminder_email(client_email, first_name, formatted_date)
         else:
             log(f"No incomplete forms for {client_name}, no email sent")
 
 if __name__ == "__main__":
     main()
-no 
