@@ -106,12 +106,15 @@ def main():
         if not client_email:
             log(f"No email for {client_name}, skipping")
             continue
-
+        if incomplete_forms:
+            from datetime import datetime
+            dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
+            formatted_date = dt.strftime("%m/%d/%Y at %I:%M %p")
+            send_reminder_email(client_email, first_name, formatted_date)
         incomplete_forms = get_incomplete_form_requests(record_id, token)
         log(f"Incomplete forms for {client_name}: {len(incomplete_forms)}")
 
-        if incomplete_forms:
-            send_reminder_email(client_email, first_name, session_date)
+        
         else:
             log(f"No incomplete forms for {client_name}, no email sent")
 
