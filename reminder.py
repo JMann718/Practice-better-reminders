@@ -31,7 +31,7 @@ def get_access_token():
     return response.json()["access_token"]
 
 def get_sessions_in_7_days(token):
-    now = datetime.now(timezone.EST)
+    now = datetime.now(timezone.utc)
     target_start = (now + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     target_end = (now + timedelta(days=7)).replace(hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
