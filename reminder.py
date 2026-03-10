@@ -31,7 +31,7 @@ def get_access_token():
     return response.json()["access_token"]
 
 def get_sessions_in_7_days(token):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.EST)
     target_start = (now + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     target_end = (now + timedelta(days=7)).replace(hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
@@ -72,7 +72,7 @@ Hi {first_name},
 
 This is a friendly reminder that your appointment is scheduled for {formatted_date}.
 
-We noticed you have forms that still need to be completed. Please log into your client portal to complete them before your appointment.
+I noticed you have forms that still need to be completed. Please log into your client portal to complete them before your appointment.
 
 Thank you!
     """
@@ -112,7 +112,8 @@ def main():
 
         if incomplete_forms:
             dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
-            formatted_date = dt.strftime("%m/%d/%Y at %I:%M %p")
+            dt_eastern = dt - timedelta(hours=4)
+            formatted_date = dt_eastern.strftime("%m/%d/%Y at %I:%M %p")
             send_reminder_email(client_email, first_name, formatted_date)
         else:
             log(f"No incomplete forms for {client_name}, no email sent")
