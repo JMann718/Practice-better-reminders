@@ -67,12 +67,14 @@ def send_reminder_email(client_email, first_name, formatted_date):
     msg["To"] = client_email
     msg["Subject"] = "Reminder: Please Complete Your Forms Before Your Appointment"
 
-    body = f"""
+body = f"""
 Hi {first_name},
 
 This is a friendly reminder that your appointment is scheduled for {formatted_date}.
 
-I noticed you have forms that still need to be completed. Please log into your client portal to complete them before your appointment.   
+We noticed you have forms that still need to be completed. Please log into your client portal to complete them before your appointment.
+
+Forms not completed at least 48 hours prior to your scheduled appointment will cause the appointment to be cancelled. It is important that I have this paperwork to prepare for our visit.
 
 Thank you!
     """
