@@ -1,1 +1,20 @@
-
+name: Cancel Appointments Missing Forms
+on:
+  schedule:
+    - cron: '0 14 * * *'  # Runs daily at 9 AM EST
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - run: python cancel_appointments.py
+        env:
+          PB_CLIENT_ID: ${{ secrets.PB_CLIENT_ID }}
+          PB_CLIENT_SECRET: ${{ secrets.PB_CLIENT_SECRET }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
