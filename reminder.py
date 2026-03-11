@@ -67,8 +67,7 @@ def send_reminder_email(client_email, first_name, formatted_date):
     msg["To"] = client_email
     msg["Subject"] = "Reminder: Please Complete Your Forms Before Your Appointment"
 
-body = f"""
-Hi {first_name},
+    body = f"""Hi {first_name},
 
 This is a friendly reminder that your appointment is scheduled for {formatted_date}.
 
@@ -76,8 +75,8 @@ We noticed you have forms that still need to be completed. Please log into your 
 
 Forms not completed at least 48 hours prior to your scheduled appointment will cause the appointment to be cancelled. It is important that I have this paperwork to prepare for our visit.
 
-Thank you!
-    """
+Thank you!"""
+
     msg.attach(MIMEText(body, "plain"))
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
