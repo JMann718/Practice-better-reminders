@@ -75,8 +75,9 @@ We noticed you have forms that still need to be completed. Please log into your 
 
 Forms not completed at least 48 hours prior to your scheduled appointment will cause the appointment to be cancelled. It is important that I have this paperwork to prepare for our visit.
 
-Thank you!"""
+In addition, if you have Medicare, please ensure a referral from your physician is received by my office as well prior to the appointment. Referral must include your diagnosis and recent labs. Referrals should be faxed to 954-678-2590 or emailed to Jennifer@JMannNutrition.com
 
+Thank you!"""
     msg.attach(MIMEText(body, "plain"))
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
