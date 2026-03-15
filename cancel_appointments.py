@@ -33,8 +33,12 @@ def get_access_token():
 
 def get_sessions_in_48_hours(token):
     now = datetime.now(timezone.utc)
-    target_start = (now + timedelta(hours=48)).replace(minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    target_end = (now + timedelta(hours=49)).replace(minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+    # FIX: Use a 2-hour window (47-49 hours out) instead of 1-hour (48-49 hours).
+    # This ensures appointments are caught regardless of what time of day the
+    # script runs — e.g., a 9 AM appointment won't be missed if the script runs at 10 AM.
+    target_start = (now + timedelta(hours=47)).replace(minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    target_end   = (now + timedelta(hours=49)).replace(minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
     log(f"Looking for sessions between {target_start} and {target_end}")
 
@@ -113,7 +117,7 @@ def main():
     log("Successfully got access token")
 
     sessions = get_sessions_in_48_hours(token)
-    log(f"Found {len(sessions)} sessions in 48 hours")
+    log(f"Found {len(sessions)} sessions in 48-hour window")
 
     for session in sessions:
         client_record = session.get("clientRecord", {})
@@ -124,8 +128,15 @@ def main():
         client_name = f"{first_name} {profile.get('lastName', '')}".strip()
         client_email = profile.get("emailAddress")
         session_date = session.get("sessionDate", "")
+        session_status = session.get("status", "").lower()
 
-        log(f"Checking client: {client_name}, email: {client_email}, date: {session_date}")
+        log(f"Checking client: {client_name}, email: {client_email}, date: {session_date}, status: {session_status}")
+
+        # FIX: Skip sessions that are already cancelled to avoid duplicate actions
+        # if the script runs more than once in the same day.
+        if session_status in ("cancelled", "canceled"):
+            log(f"Session {session_id} is already cancelled, skipping")
+            continue
 
         if not client_email:
             log(f"No email for {client_name}, skipping")
