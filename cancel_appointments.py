@@ -34,11 +34,12 @@ def get_access_token():
 def get_sessions_in_48_hours(token):
     now = datetime.now(timezone.utc)
 
-    # FIX: Use a 2-hour window (47-49 hours out) instead of 1-hour (48-49 hours).
-    # This ensures appointments are caught regardless of what time of day the
-    # script runs — e.g., a 9 AM appointment won't be missed if the script runs at 10 AM.
-    target_start = (now + timedelta(hours=47)).replace(minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    target_end   = (now + timedelta(hours=49)).replace(minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    # Check ALL appointments on the date that is exactly 2 days (48 hours) from now.
+    # Using a full-day window instead of a narrow 2-hour window ensures ALL appointment
+    # times are caught regardless of when the script runs during the day.
+    target_date  = (now + timedelta(days=2)).replace(hour=0, minute=0, second=0, microsecond=0)
+    target_start = target_date.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    target_end   = target_date.replace(hour=23, minute=59, second=59).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
     log(f"Looking for sessions between {target_start} and {target_end}")
 
@@ -132,8 +133,7 @@ def main():
 
         log(f"Checking client: {client_name}, email: {client_email}, date: {session_date}, status: {session_status}")
 
-        # FIX: Skip sessions that are already cancelled to avoid duplicate actions
-        # if the script runs more than once in the same day.
+        # Skip sessions that are already cancelled to avoid duplicate actions
         if session_status in ("cancelled", "canceled"):
             log(f"Session {session_id} is already cancelled, skipping")
             continue
