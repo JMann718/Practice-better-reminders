@@ -108,7 +108,11 @@ def main():
         if not client_email:
             log(f"No email for {client_name}, skipping")
             continue
-
+        # Skip cancelled sessions
+        status = session.get("status", "")
+        if status.lower() in ["cancelled", "canceled"]:
+            log(f"Session for {client_name} is cancelled, skipping")
+            continue
         incomplete_forms = get_incomplete_form_requests(record_id, token)
         log(f"Incomplete forms for {client_name}: {len(incomplete_forms)}")
 
