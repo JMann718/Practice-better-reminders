@@ -61,6 +61,29 @@ def get_incomplete_form_requests(record_id, token):
     forms = response.json().get("items", [])
     return [f for f in forms if not f.get("completed")]
 
+def is_cancelled(session):
+    """Check every plausible field Practice Better might use to mark a session cancelled."""
+    # Log all top-level keys on the first pass to help identify the right field
+    log(f"  session keys: {sorted(session.keys())}")
+    # Check 'status' field (various spellings)
+    status = str(session.get("status") or "").lower()
+    if status in ("cancelled", "canceled", "cancellation", "voided"):
+        return True
+    # Check 'sessionStatus' field
+    session_status = str(session.get("sessionStatus") or "").lower()
+    if session_status in ("cancelled", "canceled", "cancellation", "voided"):
+        return True
+    # Check boolean/truthy cancellation fields
+    if session.get("isCancelled") or session.get("is_cancelled"):
+        return True
+    # Check date-based cancellation fields (non-null means cancelled)
+    if session.get("cancelledAt") or session.get("cancelled_at") or session.get("canceledAt"):
+        return True
+    # Check nested cancellation object
+    if session.get("cancellation"):
+        return True
+    return False
+
 def send_alert_email(client_name, client_email, formatted_date):
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
@@ -94,10 +117,9 @@ def main():
         client_name = f"{first_name} {profile.get('lastName', '')}".strip()
         client_email = profile.get("emailAddress")
         session_date = session.get("sessionDate", "")
-        session_status = session.get("status", "").lower()
-        log(f"Checking client: {client_name}, email: {client_email}, date: {session_date}, status: {session_status}")
-        if session_status in ("cancelled", "canceled"):
-            log(f"Session {session_id} is already cancelled, skipping")
+        log(f"Checking client: {client_name}, date: {session_date}")
+        if is_cancelled(session):
+            log(f"Session {session_id} is cancelled, skipping")
             continue
         if not client_email:
             log(f"No email for {client_name}, skipping")
