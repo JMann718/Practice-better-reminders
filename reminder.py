@@ -30,13 +30,12 @@ def get_access_token():
     response.raise_for_status()
     return response.json()["access_token"]
 
-def get_sessions_in_7_days(token):
+def get_sessions_on_day(days_out, token):
     now = datetime.now(timezone.utc)
-    target_start = (now + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    target_end = (now + timedelta(days=7)).replace(hour=23, minute=59, second=59, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-
+    target_date = (now + timedelta(days=days_out)).replace(hour=0, minute=0, second=0, microsecond=0)
+    target_start = target_date.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    target_end = target_date.replace(hour=23, minute=59, second=59).strftime("%Y-%m-%dT%H:%M:%S+00:00")
     log(f"Looking for sessions between {target_start} and {target_end}")
-
     headers = {"Authorization": f"Bearer {token}"}
     response = requests.get(
         f"{PRACTICE_BETTER_BASE_URL}/consultant/sessions",
@@ -66,34 +65,28 @@ def send_reminder_email(client_email, first_name, formatted_date):
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = client_email
     msg["Subject"] = "Reminder: Please Complete Your Forms Before Your Appointment"
-
-    body = f"""Hi {first_name},
-
-This is a friendly reminder that your appointment is scheduled for {formatted_date}.
-
-We noticed you have forms that still need to be completed. Please log into your client portal to complete them before your appointment.
-
-Forms not completed at least 48 hours prior to your scheduled appointment will cause the appointment to be cancelled. It is important that I have this paperwork to prepare for our visit.
-
-In addition, if you have Medicare, please ensure a referral from your physician is received by my office as well prior to the appointment. Referral must include your diagnosis and recent labs. Referrals should be faxed to 954-678-2590 or emailed to Jennifer@JMannNutrition.com
-
-Thank you!"""
+    body = (
+        f"Hi {first_name},\n\n"
+        f"This is a friendly reminder that your appointment is scheduled for {formatted_date}.\n\n"
+        f"We noticed you have forms that still need to be completed. Please log into your Practice Better "
+        f"account and look under Forms to see what is needed.\n\n"
+        f"Forms not completed at least 48 hours prior to your scheduled appointment will cause the "
+        f"appointment to be cancelled. It is important that I have this paperwork to prepare for our visit.\n\n"
+        f"In addition, if you have Medicare, please ensure a referral from your physician is received by "
+        f"my office as well prior to the appointment. Referral must include your diagnosis and recent labs. "
+        f"Referrals should be faxed to 954-678-2590 or emailed to Jennifer@JMannNutrition.com\n\n"
+        f"Thank you!"
+    )
     msg.attach(MIMEText(body, "plain"))
-
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_ADDRESS, client_email, msg.as_string())
-
     log(f"Reminder sent to {first_name} ({client_email})")
 
-def main():
-    log("Starting reminder script")
-    token = get_access_token()
-    log("Successfully got access token")
-
-    sessions = get_sessions_in_7_days(token)
+def process_sessions(days_out, token):
+    log(f"--- Checking sessions {days_out} days out ---")
+    sessions = get_sessions_on_day(days_out, token)
     log(f"Found {len(sessions)} sessions")
-
     for session in sessions:
         client_record = session.get("clientRecord", {})
         record_id = client_record.get("id")
@@ -102,20 +95,16 @@ def main():
         client_name = f"{first_name} {profile.get('lastName', '')}".strip()
         client_email = profile.get("emailAddress")
         session_date = session.get("sessionDate", "")
-
-        log(f"Checking client: {client_name}, email: {client_email}, date: {session_date}")
-
+        is_cancelled = session.get("cancelled", False)
+        log(f"Checking client: {client_name}, email: {client_email}, date: {session_date}, cancelled: {is_cancelled}")
+        if is_cancelled:
+            log(f"Session for {client_name} is cancelled, skipping")
+            continue
         if not client_email:
             log(f"No email for {client_name}, skipping")
             continue
-        # Skip cancelled sessions
-        status = session.get("status", "")
-        if status.lower() in ["cancelled", "canceled"]:
-            log(f"Session for {client_name} is cancelled, skipping")
-            continue
         incomplete_forms = get_incomplete_form_requests(record_id, token)
         log(f"Incomplete forms for {client_name}: {len(incomplete_forms)}")
-
         if incomplete_forms:
             dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
             dt_eastern = dt - timedelta(hours=4)
@@ -123,6 +112,13 @@ def main():
             send_reminder_email(client_email, first_name, formatted_date)
         else:
             log(f"No incomplete forms for {client_name}, no email sent")
+
+def main():
+    log("Starting reminder script")
+    token = get_access_token()
+    log("Successfully got access token")
+    process_sessions(7, token)
+    process_sessions(4, token)
 
 if __name__ == "__main__":
     main()
