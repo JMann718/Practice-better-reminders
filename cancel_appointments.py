@@ -60,7 +60,7 @@ def get_incomplete_form_requests(record_id, token):
     )
     response.raise_for_status()
     forms = response.json().get("items", [])
-        return [f for f in forms if not f.get("completed") and "RDA" in (f.get("form", {}).get("name", "") or "")]
+    return [f for f in forms if not f.get("completed")]
 
 def cancel_session(session_id, token):
     headers = {
@@ -71,8 +71,8 @@ def cancel_session(session_id, token):
         f"{PRACTICE_BETTER_BASE_URL}/consultant/sessions/{session_id}/cancel",
         headers=headers,
         json={
-            "notify": True,h
-                        "notes": "Appointment cancelled due to incomplete RDA form."
+            "notify": True,
+            "notes": "Appointment cancelled due to incomplete intake forms."
         }
     )
     response.raise_for_status()
@@ -85,8 +85,8 @@ def send_cancellation_email(client_email, first_name, formatted_date):
     msg["Subject"] = "Appointment Cancelled - Please Call to Reschedule"
     body = (
         f"Hi {first_name},\n\n"
-                    f"Unfortunately your appointment scheduled for {formatted_date} has been cancelled "
-                    f"due to an incomplete RDA form.\n\n"
+        f"Unfortunately your appointment scheduled for {formatted_date} has been cancelled "
+        f"due to incomplete intake forms.\n\n"
         f"Please call our office at {OFFICE_PHONE} to reschedule your appointment.\n\n"
         f"If you have any questions, please don't hesitate to reach out.\n\n"
         f"Thank you!"
@@ -101,11 +101,11 @@ def send_alert_email(client_name, client_email, formatted_date):
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = JENNIFER_EMAIL
-            msg["Subject"] = f"Appointment Cancelled - Incomplete RDA Form: {client_name} - {formatted_date}"
+    msg["Subject"] = f"Appointment Cancelled - Incomplete Forms: {client_name} - {formatted_date}"
     body = (
         "Hi Jennifer,\n\n"
         f"This is an automated alert: {client_name} ({client_email}) had an appointment on "
-                    f"{formatted_date} that has been cancelled due to an incomplete RDA form.\n\n"
+        f"{formatted_date} that has been cancelled due to incomplete intake forms.\n\n"
         f"The client has been notified to call the office at {OFFICE_PHONE} to reschedule.\n\n"
         "Thank you!"
     )
@@ -116,7 +116,7 @@ def send_alert_email(client_name, client_email, formatted_date):
     log(f"Alert email sent to Jennifer for {client_name}")
 
 def main():
-            log("Starting RDA form check for upcoming appointments")
+    log("Starting incomplete forms check")
     token = get_access_token()
     log("Successfully got access token")
     sessions = get_sessions_in_48_hours(token)
@@ -139,7 +139,7 @@ def main():
             log(f"No email for {client_name}, skipping")
             continue
         incomplete_forms = get_incomplete_form_requests(record_id, token)
-                log(f"Incomplete RDA forms for {client_name}: {len(incomplete_forms)}")
+        log(f"Incomplete forms for {client_name}: {len(incomplete_forms)}")
         if incomplete_forms:
             dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
             dt_eastern = dt - timedelta(hours=4)
@@ -148,7 +148,7 @@ def main():
             send_cancellation_email(client_email, first_name, formatted_date)
             send_alert_email(client_name, client_email, formatted_date)
         else:
-                        log(f"RDA form is complete for {client_name}, no cancellation needed")
+            log(f"No incomplete forms for {client_name}, no action needed")
 
 if __name__ == "__main__":
     main()
