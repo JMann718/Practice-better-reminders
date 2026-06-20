@@ -60,13 +60,11 @@ def get_incomplete_rda_forms(record_id, token):
     )
     response.raise_for_status()
     forms = response.json().get("items", [])
-    # Log all form names for visibility
     for f in forms:
         form_obj = f.get("form") or {}
         name = form_obj.get("name") or f.get("name") or "(unknown)"
         completed = f.get("completed", False)
         log(f"  Form: '{name}', completed: {completed}")
-    # Only return RDA forms that are not completed
     incomplete_rda = [
         f for f in forms
         if not f.get("completed")
@@ -129,10 +127,22 @@ def send_alert_email(client_name, client_email, formatted_date):
 
 def main():
     log("Starting incomplete RDA form check")
-    token = get_access_token()
-    log("Successfully got access token")
-    sessions = get_sessions_in_48_hours(token)
-    log(f"Found {len(sessions)} sessions in 48-hour window")
+    try:
+        token = get_access_token()
+        log("Successfully got access token")
+    except Exception as e:
+        log(f"ERROR: Could not get access token: {e}")
+        log("Exiting gracefully - will retry tomorrow")
+        sys.exit(0)
+
+    try:
+        sessions = get_sessions_in_48_hours(token)
+        log(f"Found {len(sessions)} sessions in 48-hour window")
+    except Exception as e:
+        log(f"ERROR: Could not fetch sessions from Practice Better API: {e}")
+        log("Exiting gracefully - will retry tomorrow")
+        sys.exit(0)
+
     for session in sessions:
         client_record = session.get("clientRecord", {})
         record_id = client_record.get("id")
@@ -150,15 +160,22 @@ def main():
         if not client_email:
             log(f"No email for {client_name}, skipping")
             continue
-        incomplete_rda = get_incomplete_rda_forms(record_id, token)
-        log(f"Incomplete RDA forms for {client_name}: {len(incomplete_rda)}")
+        try:
+            incomplete_rda = get_incomplete_rda_forms(record_id, token)
+            log(f"Incomplete RDA forms for {client_name}: {len(incomplete_rda)}")
+        except Exception as e:
+            log(f"ERROR: Could not fetch forms for {client_name}: {e} - skipping")
+            continue
         if incomplete_rda:
             dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
             dt_eastern = dt - timedelta(hours=4)
             formatted_date = dt_eastern.strftime("%m/%d/%Y at %I:%M %p")
-            cancel_session(session_id, token)
-            send_cancellation_email(client_email, first_name, formatted_date)
-            send_alert_email(client_name, client_email, formatted_date)
+            try:
+                cancel_session(session_id, token)
+                send_cancellation_email(client_email, first_name, formatted_date)
+                send_alert_email(client_name, client_email, formatted_date)
+            except Exception as e:
+                log(f"ERROR: Failed to cancel/notify for {client_name}: {e}")
         else:
             log(f"No incomplete RDA form for {client_name}, no action needed")
 
