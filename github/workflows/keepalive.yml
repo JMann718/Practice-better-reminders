@@ -1,0 +1,14 @@
+name: Keep Repo Active
+on:
+  schedule:
+    - cron: "0 12 * * 0"  # every Sunday at noon UTC — keeps the 60-day inactivity clock from ever running out
+  workflow_dispatch:
+permissions:
+  actions: write
+jobs:
+  keepalive:
+    name: Keepalive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gautamkrishnar/keepalive-workflow@v2
