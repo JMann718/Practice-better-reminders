@@ -2,6 +2,7 @@ import os
 import sys
 import requests
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -13,6 +14,10 @@ GMAIL_ADDRESS = os.environ["GMAIL_ADDRESS"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 
 PRACTICE_BETTER_BASE_URL = "https://api.practicebetter.io"
+EASTERN = ZoneInfo("America/New_York")
+OFFICE_PHONE = "954-787-2554"
+# cancel_appointments.py runs daily at 14:00 UTC and cancels sessions 2 days out
+CANCEL_RUN_HOUR_UTC = 14
 
 def log(msg):
     print(msg, flush=True)
@@ -67,13 +72,17 @@ REMINDERS = {
         "This is a friendly reminder that your appointment is scheduled for {date}."),
     5: ("Second Reminder: Please Complete Your Forms Before Your Appointment",
         "This is a second reminder that your appointment is scheduled for {date}."),
-    3: ("Final Reminder: Forms Due Within 24 Hours to Keep Your Appointment",
+    3: ("Final Reminder: Forms Due Tomorrow Morning to Keep Your Appointment",
         "This is a final reminder that your appointment is scheduled for {date}. "
-        "Your forms must be completed within the next 24 hours or your appointment will be cancelled."),
+        "Your forms must be completed by tomorrow morning (see the deadline below) or your appointment will be cancelled."),
 }
 
-def send_reminder_email(client_email, first_name, formatted_date, days_out):
+def form_name(f):
+    return (f.get("form") or {}).get("name") or f.get("name") or "Intake form"
+
+def send_reminder_email(client_email, first_name, formatted_date, deadline, form_names, days_out):
     subject, opening = REMINDERS[days_out]
+    form_list = "\n".join(f"  - {n}" for n in form_names)
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = client_email
@@ -81,10 +90,16 @@ def send_reminder_email(client_email, first_name, formatted_date, days_out):
     body = (
         f"Hi {first_name},\n\n"
         f"{opening.format(date=formatted_date)}\n\n"
-        f"We noticed you have forms that still need to be completed. Please log into your Practice Better "
-        f"account and look under Forms to see what is needed.\n\n"
-        f"Forms not completed at least 48 hours prior to your scheduled appointment will cause the "
-        f"appointment to be cancelled. It is important that I have this paperwork to prepare for our visit.\n\n"
+        f"You still have the following form(s) to complete:\n"
+        f"{form_list}\n\n"
+        f"DEADLINE: {deadline}. Appointments with incomplete forms are automatically cancelled "
+        f"after this time. It is important that I have this paperwork to prepare for our visit.\n\n"
+        f"How to find your forms:\n"
+        f"  1. Go to my.practicebetter.io (or open the Practice Better app) and sign in with this email address.\n"
+        f"  2. On your home page, click the Forms tab. You can also click the bell icon in the top right "
+        f"corner to see what still needs your attention.\n"
+        f"  3. Complete each form marked incomplete.\n"
+        f"  Can't sign in? Click \"Forgot password\" on the sign-in page, or call {OFFICE_PHONE} and we'll help.\n\n"
         f"In addition, if you have Medicare, please ensure a referral from your physician is received by "
         f"my office as well prior to the appointment. Referral must include your diagnosis and recent labs. "
         f"Referrals should be faxed to 954-678-2590 or emailed to Jennifer@JMannNutrition.com\n\n"
@@ -119,10 +134,12 @@ def process_sessions(days_out, token):
         incomplete_forms = get_incomplete_form_requests(record_id, token)
         log(f"Incomplete forms for {client_name}: {len(incomplete_forms)}")
         if incomplete_forms:
-            dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
-            dt_eastern = dt - timedelta(hours=4)
-            formatted_date = dt_eastern.strftime("%m/%d/%Y at %I:%M %p")
-            send_reminder_email(client_email, first_name, formatted_date, days_out)
+            dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            formatted_date = dt.astimezone(EASTERN).strftime("%A, %m/%d/%Y at %-I:%M %p")
+            cancel_run = (dt - timedelta(days=2)).replace(hour=CANCEL_RUN_HOUR_UTC, minute=0, second=0)
+            deadline = cancel_run.astimezone(EASTERN).strftime("%A, %m/%d at %-I:%M %p")
+            form_names = sorted({form_name(f) for f in incomplete_forms})
+            send_reminder_email(client_email, first_name, formatted_date, deadline, form_names, days_out)
         else:
             log(f"No incomplete forms for {client_name}, no email sent")
 
