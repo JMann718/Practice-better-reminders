@@ -60,14 +60,27 @@ def get_incomplete_form_requests(record_id, token):
     forms = response.json().get("items", [])
     return [f for f in forms if not f.get("completed")]
 
-def send_reminder_email(client_email, first_name, formatted_date):
+# Reminder schedule: days before the appointment -> (subject, opening line)
+# The cancellation check (cancel_appointments.py) runs at 48 hours out.
+REMINDERS = {
+    7: ("Reminder: Please Complete Your Forms Before Your Appointment",
+        "This is a friendly reminder that your appointment is scheduled for {date}."),
+    5: ("Second Reminder: Please Complete Your Forms Before Your Appointment",
+        "This is a second reminder that your appointment is scheduled for {date}."),
+    3: ("Final Reminder: Forms Due Within 24 Hours to Keep Your Appointment",
+        "This is a final reminder that your appointment is scheduled for {date}. "
+        "Your forms must be completed within the next 24 hours or your appointment will be cancelled."),
+}
+
+def send_reminder_email(client_email, first_name, formatted_date, days_out):
+    subject, opening = REMINDERS[days_out]
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = client_email
-    msg["Subject"] = "Reminder: Please Complete Your Forms Before Your Appointment"
+    msg["Subject"] = subject
     body = (
         f"Hi {first_name},\n\n"
-        f"This is a friendly reminder that your appointment is scheduled for {formatted_date}.\n\n"
+        f"{opening.format(date=formatted_date)}\n\n"
         f"We noticed you have forms that still need to be completed. Please log into your Practice Better "
         f"account and look under Forms to see what is needed.\n\n"
         f"Forms not completed at least 48 hours prior to your scheduled appointment will cause the "
@@ -81,7 +94,7 @@ def send_reminder_email(client_email, first_name, formatted_date):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_ADDRESS, client_email, msg.as_string())
-    log(f"Reminder sent to {first_name} ({client_email})")
+    log(f"{days_out}-day reminder sent to {first_name} ({client_email})")
 
 def process_sessions(days_out, token):
     log(f"--- Checking sessions {days_out} days out ---")
@@ -109,7 +122,7 @@ def process_sessions(days_out, token):
             dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
             dt_eastern = dt - timedelta(hours=4)
             formatted_date = dt_eastern.strftime("%m/%d/%Y at %I:%M %p")
-            send_reminder_email(client_email, first_name, formatted_date)
+            send_reminder_email(client_email, first_name, formatted_date, days_out)
         else:
             log(f"No incomplete forms for {client_name}, no email sent")
 
@@ -117,8 +130,8 @@ def main():
     log("Starting reminder script")
     token = get_access_token()
     log("Successfully got access token")
-    process_sessions(7, token)
-    process_sessions(4, token)
+    for days_out in sorted(REMINDERS, reverse=True):
+        process_sessions(days_out, token)
 
 if __name__ == "__main__":
     main()
