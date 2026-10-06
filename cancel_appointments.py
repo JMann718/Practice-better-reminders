@@ -2,6 +2,7 @@ import os
 import sys
 import requests
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -167,9 +168,8 @@ def main():
             log(f"ERROR: Could not fetch forms for {client_name}: {e} - skipping")
             continue
         if incomplete_rda:
-            dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ")
-            dt_eastern = dt - timedelta(hours=4)
-            formatted_date = dt_eastern.strftime("%m/%d/%Y at %I:%M %p")
+            dt = datetime.strptime(session_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            formatted_date = dt.astimezone(ZoneInfo("America/New_York")).strftime("%m/%d/%Y at %I:%M %p")
             try:
                 cancel_session(session_id, token)
                 send_cancellation_email(client_email, first_name, formatted_date)
